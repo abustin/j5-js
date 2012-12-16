@@ -1,0 +1,348 @@
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+	<title>Ball Room</title>
+	<meta name="generator" content="TextMate http://macromates.com/"/>
+	<meta name="author" content="Alex Bustin"/>
+	
+	<script id="vBasic" type="x-shader/x-vertex">
+	
+		attribute vec3 aVertexPosition;
+		attribute vec2 aTextureCoord;
+		
+		uniform float time;
+		uniform float idx;
+		uniform mat4 uMVMatrix;
+		uniform mat4 uPMatrix;
+		uniform sampler2D texture;
+		
+		varying vec2 tc;
+		varying vec3 screen;
+		
+	  void main(void) {
+		mat4 PMVMatrix = uPMatrix * uMVMatrix;
+		vec4 pos = vec4(aVertexPosition, 1.0);
+	    tc = vec2(aTextureCoord.s, aTextureCoord.t);
+		screen = (uMVMatrix*pos).xyz;
+		gl_Position = PMVMatrix*pos;
+	  }
+
+	</script>
+	
+	<script id="fAlphaTexture" type="x-shader/x-fragment">
+
+		#ifdef GL_ES
+		precision highp float;
+		#endif
+		
+		uniform sampler2D texture;
+		uniform float alpha;
+		varying vec3 screen;
+		
+		varying vec2 tc;
+		
+		uniform float time;
+		uniform float idx;
+		
+		void main(void) {	
+			gl_FragColor = texture2D(texture, tc);//*sin(time)*sin(idx/1.0);
+			gl_FragColor.g *= sin(time*0.4+idx+screen.x);
+			float fog = smoothstep(-4.0,1.0,screen.z);
+			gl_FragColor.rgb *= fog*fog*fog*1.6;
+		}
+
+	</script>
+	
+	
+	<script type="text/javascript" charset="utf-8" src="CanvasMatrix.js"></script>
+	<!--<script type="text/javascript" charset="utf-8" src="webgl-debug.js"></script>-->
+	<script type="text/javascript" charset="utf-8" src="Framerate.js"></script>
+	<script type="text/javascript" charset="utf-8" src="j5.js"></script>
+	<script type="text/javascript" charset="utf-8" src="j5-polygon.js"></script>
+	
+	
+	
+	
+	<script type="text/javascript" charset="utf-8">
+		//<![CDATA[
+	
+		var switchTexture;
+	
+		function init() {
+			
+			"use strict";
+			
+			j5.attachCanvas(document.getElementById("webglcanvas"));
+			
+			var textures=[
+				"colortiles.png", 
+				"leaf.png", 
+				"best.jpg",
+				"psychoUpatternUpurple.jpg",
+				"face.png",
+				"392.jpg",
+				"fruit_apple01.jpg",
+				"1069642779_c4d52d0aa2_o.jpg"
+			];
+			
+			var sqrt = Math.sqrt;
+			var balls = [];
+			var drawSphere = j5.sphere(25,25).draw;
+			var texShader = j5.shader();
+			var slider = document.getElementById("ballcount");
+			var tick = 0;
+
+			
+			// todo: reduce the need to access bare gl context
+			j5.gl.enable(j5.gl.CULL_FACE);
+			j5.gl.cullFace(j5.gl.BACK);
+			j5.gl.frontFace(j5.gl.CW);
+			
+			switchTexture = function() {
+				textures.push(textures.shift())
+				j5.texture(textures[0], function(txt) {
+					texShader.$texture = txt;
+				});
+			};
+			
+			switchTexture();
+			
+			j5.onFramerate(function(msg) {
+				window.status =  msg;
+			});
+			
+			j5.requestAnimationFrame(function onFrame() {
+				
+				update();
+				
+				// local obj cache 
+				var bls = balls, i;
+				var blsLen =  bls.length;
+				var draw = drawSphere;
+				var shader = texShader;
+				var offset = j5.offset;
+				
+				// Draw all the balls
+				for (i=0;i<blsLen;++i) {
+					shader.$time = tick;
+					shader.$idx = i+1;
+					tick+= 0.001;
+					draw(shader, offset(bls[i].position));
+				}
+				
+				j5.requestAnimationFrame(onFrame);
+				
+			});
+			
+			
+
+			var dot = function(a, b) {
+				return a.x * b.x + a.y * b.y + a.z * b.z;
+			};
+			
+			var vectorLength = function(v) {
+				return sqrt(v.x*v.x+v.y*v.y+v.z*v.z);
+			};
+			
+			var distanceVector = function(a, b, d) {
+				a = a.position;
+				b = b.position;
+
+				d.x= a.x-b.x;
+				d.y= a.y-b.y;
+				d.z= a.z-b.z;
+				
+				return d;
+			};
+			
+			var d = {};
+			
+			var hitTest = function(ball1, ball2) {
+				
+				var a = ball1.position;
+				var b = ball2.position;
+				var collision = d;
+				
+				collision.x= a.x-b.x;
+				collision.y= a.y-b.y;
+				collision.z= a.z-b.z;
+				
+				var combinedRadius = ball1.radius+ball2.radius;
+				
+				var distance = sqrt(collision.x*collision.x+collision.y*collision.y+collision.z*collision.z);
+				
+				if (distance > combinedRadius) {
+					return;
+				}
+				
+				var delta = (combinedRadius-distance);
+				var bv1 = ball1.vector;
+				var bv2 = ball2.vector;
+				
+				collision.x /= distance;
+				collision.y /= distance;
+				collision.z /= distance;
+				
+				var aci = dot(bv1, collision);
+				var bci = dot(bv2, collision);
+				
+				var acf = bci;
+				var bcf = aci;
+				
+				var ac1 = (acf - aci);
+				var ac2 = (bcf - bci);
+				
+				bv1.x += ac1 * collision.x;
+				bv1.y += ac1 * collision.y;
+				bv1.z += ac1 * collision.z;
+				
+				bv2.x += ac2 * collision.x;
+				bv2.y += ac2 * collision.y;
+				bv2.z += ac2 * collision.z;
+				
+				
+				move(ball1, delta/vectorLength(bv1));
+				move(ball2, delta/vectorLength(bv2));
+				
+				bv1 = ball1.rotateVector;
+				bv2 = ball2.rotateVector;
+				
+				aci = dot(bv1, collision);
+				bci = dot(bv2, collision);
+				
+				acf = bci;
+				bcf = aci;
+				
+				ac1 = (acf - aci);
+				ac2 = (bcf - bci);
+				
+				bv1.x += ac1 * collision.x;
+				bv1.y += ac1 * collision.y;
+				bv1.z += ac1 * collision.z;
+				
+				bv2.x += ac2 * collision.x;
+				bv2.y += ac2 * collision.y;
+				bv2.z += ac2 * collision.z;
+				
+			};
+			
+			var wallTest = function(ball) {
+				
+				var p = ball.position;
+				var v = ball.vector;
+				var w = 2;
+				
+				if (p.x > w) {
+					v.x*=-1;
+					p.x = w; 
+				}
+				else if (p.x < -w) {
+					v.x*=-1;
+					p.x = -w;
+				}
+				
+				if (p.y > w) {
+					v.y*=-1;
+					p.y = w; 
+				}
+				else if (p.y < -w) {
+					v.y*=-1;
+					p.y = -w;
+				}
+				
+				if (p.z > w) {
+					v.z*=-1;
+					p.z = w; 
+				}
+				else if (p.z < -w) {
+					v.z*=-1;
+					p.z = -w;
+				}
+				
+			};
+			
+			var move = function(ball, f) {
+				f = f||1;
+				var p = ball.position;
+				var v = ball.vector;
+				p.x += v.x*f;
+				p.y += v.y*f;
+				p.z += v.z*f;
+				p.rotateX += ball.rotateVector.x*f;
+			};
+			
+			var update = function() {
+				var numBalls = balls.length,i,j,bi;
+				for (i = 0; i < numBalls; ++i) {  
+					bi=balls[i];
+				    move(bi);
+					wallTest(bi);
+					for (j = i + 1; j < numBalls; ++j) {  
+				        hitTest(bi,balls[j]);
+				    }		
+				}
+			};
+			
+			var ran = function() {
+				return Math.random()*2-1;
+			};
+			
+			var ball = function() {
+				
+				var r  = 0.2+Math.random()*0.2;
+				
+				return {
+					radius:r/2,
+					vector:{
+						x:ran()*0.01,
+						y:ran()*0.01,
+						z:ran()*0.01
+					},
+					rotateVector:{
+						x:ran()*0.08,
+						y:ran()*0.08,
+						z:ran()*0.08
+					},
+					position:{
+						rotateX:ran(),
+						rotateY:ran(),
+						rotateZ:ran(),
+						x:ran(),
+						y:ran(),
+						z:ran(),
+						scaleX:r,
+						scaleY:r,
+						scaleZ:r
+					}
+				};
+				
+			};
+			
+			var updateBallCount = function() {
+				var target = slider.value;	
+				while (balls.length < target) {
+					balls.push(ball());
+				}
+				while (balls.length > target) {
+					balls.pop();
+				}
+			};
+			
+			slider.onchange = updateBallCount;
+			updateBallCount();
+
+		}
+		
+		window.addEventListener("load", init, false);
+		//]]>
+	</script>
+	
+	<!-- Date: 2011-06-18 -->
+</head>
+<body>
+		<div class="controls"><label>Change number of balls: x</label><input id="ballcount" type="range" min="1" max="500" value="150" step="1"><!----></input> <a href="javascript:switchTexture();void(0)">Change Texture</a>
+		</div>
+	
+		<canvas style="background-color:black" id="webglcanvas" width="800" height="650"><!----></canvas>
+</body>
+</html>
