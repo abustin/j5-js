@@ -1,0 +1,262 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
+
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+	<title>Extrude Dynamic Polygon</title>
+	<meta name="generator" content="TextMate http://macromates.com/"/>
+	<meta name="author" content="Alex Bustin"/>
+	
+	<script id="vBasic" type="x-shader/x-vertex">
+
+	  attribute vec3 aVertexPosition;
+	  attribute vec2 aTextureCoord;
+
+	  uniform mat4 uMVMatrix;
+	  uniform mat4 uPMatrix;
+	  uniform sampler2D texture;
+
+	  varying vec2 tc;
+	  varying vec3 screen;
+
+	  void main(void) {
+		mat4 PMVMatrix = uPMatrix * uMVMatrix;
+		vec4 pos = vec4(aVertexPosition, 1.0);
+	    tc = vec2(aTextureCoord.s, aTextureCoord.t);
+		screen = (uMVMatrix*pos).xyz;
+		gl_Position = PMVMatrix*pos;
+	  }
+
+	</script>
+	
+	<script id="fAlphaTexture" type="x-shader/x-fragment">
+
+		#ifdef GL_ES
+		  		precision highp float;
+		#endif
+		uniform sampler2D texture;
+		uniform float alpha;
+		varying vec3 screen;
+		
+		varying vec2 tc;
+
+		void main(void) {
+			
+		   gl_FragColor = texture2D(texture, tc*(screen.z*0.5));
+		   gl_FragColor.rgb *= smoothstep(-1.5,1.5,screen.z);
+		}
+
+	</script>
+	
+	
+	<script type="text/javascript" charset="utf-8" src="CanvasMatrix.js"></script>
+	<!--<script type="text/javascript" charset="utf-8" src="webgl-debug.js"></script>-->
+	<script type="text/javascript" charset="utf-8" src="Framerate.js"></script>
+	<script type="text/javascript" charset="utf-8" src="j5.js"></script>
+	<script type="text/javascript" charset="utf-8" src="j5-polygon.js"></script>
+	
+	
+	
+	
+	<script type="text/javascript" charset="utf-8">
+	
+		var reset;
+
+		function init() {
+					
+			var canvas2d = 	document.getElementById("canvas2dcanvas");
+			var c2d = canvas2d.getContext("2d");
+			
+			j5.attachCanvas(document.getElementById("webglcanvas"));
+			
+			var sin = Math.sin;
+			var cos = Math.cos;
+
+			var drawThing;
+			var shape;
+			var holes;
+			var captureMode = "shape";
+			
+			// Initial window shape.  Expose global reset method.
+			reset = function() {
+				
+				captureMode = "shape";
+				
+				// x,y cords of shape outline
+				shape = [
+					[0,0],
+					[1,0],
+					[1,1],
+					[0,1]
+				];
+				
+				
+				// x,y cords of holes in shape
+				holes = [
+					[
+						[0.1,  0.1 ],
+						[0.45, 0.1 ],
+						[0.45, 0.45],
+						[0.1,  0.45]
+					],
+					[
+						[0.55, 0.55],
+						[0.9,  0.55],
+						[0.9,  0.9 ],
+						[0.55, 0.9 ]
+					],
+					[
+						[0.55, 0.1 ],
+						[0.9,  0.1 ],
+						[0.9,  0.45],
+						[0.55, 0.45]
+					],
+					[
+						[0.104, 0.55 ],
+						[0.45, 0.55 ],
+						[0.45, 0.9 ],
+						[0.104,0.9 ]
+					]	
+				];
+				
+				drawThing = j5.extrude(j5.polygon(shape, holes), 0.25).draw;
+				update2dCanvas();
+				
+			};
+
+			// handle mouse drawing
+			canvas2d.onmousedown = function() {
+				
+				var points;
+				if (captureMode == "shape") {
+					shape = [];
+					holes = [];
+					points = shape;
+				} else {
+					points = [];
+					holes.push(points);
+				} 
+				
+				var distance = function(a,b) { 
+					var square = function(v) {
+						return v*v;
+					}
+					return Math.sqrt(square(a.x - b.x) + square(a.y - b.y));
+				}
+				
+				canvas2d.onmousemove = function (e) { 
+
+				    var _x= (e.pageX - this.offsetLeft)/512;
+				    var _y= (e.pageY - this.offsetTop)/512;
+
+					if (points.length === 0 || distance({x:_x,y:_y},{
+						x:points[points.length-1][0],
+						y:points[points.length-1][1]
+					}) > 10/512) {
+						points.push([_x,_y])
+					}
+					
+					if (points.length > 2) {
+						drawThing = j5.extrude(j5.polygon(shape, holes), 0.25).draw;
+					}
+					
+					update2dCanvas();
+				
+				};
+				
+				canvas2d.onmouseup = function() {
+					captureMode = "holes"
+					canvas2d.onmousemove = null;
+				};
+				
+			};
+			
+			// draw outline and hole data on canvas2d
+			var update2dCanvas = function() {
+				
+				var drawPoly = function(poly) {
+					poly.forEach(function(p,i) {
+						if (i == 0) {
+							c2d.beginPath();	
+							c2d.moveTo(6+p[0]*500,6+p[1]*500);
+						} 
+						c2d.lineTo(6+p[0]*500,6+p[1]*500);					
+					});
+					c2d.closePath();
+					c2d.stroke();
+				}
+				
+				c2d.clearRect(0, 0, 512, 512);
+				c2d.lineWidth = 3;
+				
+				c2d.strokeStyle = "#000";
+				drawPoly(shape);
+				
+				c2d.strokeStyle = "#f00";
+				holes.forEach(drawPoly);
+
+			};
+			
+			
+			reset();
+			
+			
+			var texShader = j5.shader();
+			var container;
+			
+			var i = 0;
+			var x = 0;
+			var pi90 = Math.PI;
+			var pi45 = Math.PI*.5;
+			var pp = 0,p;
+			
+			j5.texture("leaf.png", function(txt) {
+				texShader.$texture = txt;
+				artLoaded = true;
+			});
+			
+			j5.requestAnimationFrame(function onFrame() {
+				
+				pp += .022;
+				i +=.01;
+				x +=.02;
+				p = sin(pp)
+				
+				container = j5.offset({
+					originX:.5,
+					originZ:-.5,
+					originY:.5,
+					x:-.5+sin(i)*.5,
+					y:-.25+cos(i)*.5,
+					rotateX:x,
+					z:1+.5+sin(x),
+					rotateY:x*1.01
+				});
+
+				drawThing(texShader, container);
+				drawThing(texShader, j5.offset({rotateX:-pi90+p*pi45}, container));
+				drawThing(texShader, j5.offset({rotateY:-pi90+p*pi45}, container));
+				drawThing(texShader, j5.offset({z:-1, rotateY:pi45+p*pi45}, container))
+				drawThing(texShader, j5.offset({x:1, originY:1, rotateZ:pi45+p*pi45}, container));
+
+				j5.requestAnimationFrame(onFrame);
+				
+			});
+
+		}
+		
+		window.addEventListener("load", init, false);
+
+	</script>
+	
+	<!-- Date: 2011-06-18 -->
+</head>
+<body >
+	<div class="controls">Tip: Click and drag to draw the outline of a shape (black) on the right. Then fill that shape with holes (red). <a href="javascript:reset();void(0);">reset</a></div>
+	<div style="width:1054px;">
+		<canvas style="background-color:black" id="webglcanvas" width="512" height="512"><!----></canvas>
+		<canvas style="background-color:white" id="canvas2dcanvas" width="512" height="512"><!----></canvas>
+	</div>
+</body>
+</html>

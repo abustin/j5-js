@@ -1,0 +1,132 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
+
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+	<title>Hello Cubes</title>
+	<meta name="generator" content="TextMate http://macromates.com/"/>
+	<meta name="author" content="Alex Bustin"/>
+	
+	<script id="vBasic" type="x-shader/x-vertex">
+
+	  attribute vec3 aVertexPosition;
+	  attribute vec2 aTextureCoord;
+
+	  uniform mat4 uMVMatrix;
+	  uniform mat4 uPMatrix;
+	  uniform sampler2D texture;
+
+	  varying vec2 tc;
+	  varying vec3 screen;
+
+	  void main(void) {
+		mat4 PMVMatrix = uPMatrix * uMVMatrix;
+		vec4 pos = vec4(aVertexPosition, 1.0);
+	    tc = vec2(aTextureCoord.s, aTextureCoord.t);
+		screen = (uMVMatrix*pos).xyz;
+		gl_Position = PMVMatrix*pos;
+	  }
+
+	</script>
+	
+	<script id="fAlphaTexture" type="x-shader/x-fragment">
+
+		#ifdef GL_ES
+		  		precision highp float;
+		#endif
+		uniform sampler2D texture;
+		uniform float alpha;
+		varying vec3 screen;
+		
+		varying vec2 tc;
+
+		void main(void) {
+		   gl_FragColor = texture2D(texture, tc);
+		   gl_FragColor.rgb *= smoothstep(-1.5,1.5,screen.z);
+		}
+
+	</script>
+	
+	
+	<script type="text/javascript" charset="utf-8" src="CanvasMatrix.js"></script>
+	<!--<script type="text/javascript" charset="utf-8" src="webgl-debug.js"></script>-->
+	<script type="text/javascript" charset="utf-8" src="Framerate.js"></script>
+	<script type="text/javascript" charset="utf-8" src="j5.js"></script>
+	
+	
+	
+	
+	<script type="text/javascript" charset="utf-8">
+
+		function init() {
+						
+			j5.attachCanvas(document.getElementById("webglcanvas"));
+			
+			var artLoaded = false;
+			var drawCube = j5.cube().draw;
+			var texShader = j5.shader();
+			var container;
+			
+			var i = 0;
+			var x = 2.34;
+			var mx=0;
+			var my=0;
+			var xx = 0;
+			var pi90 = Math.PI;
+			var pi45 = Math.PI*.5;
+			var sin = Math.sin;
+			var cos = Math.sin;
+			var p=0;
+			
+			j5.onFramerate(function(msg) {
+				window.status = msg;
+			});
+			
+			j5.onMouseMove(function(_x,_y) {
+				mx = _x;
+				my = _y;
+			});
+			
+			j5.texture("colortiles.png", function(txt) {
+				texShader.$texture = txt;
+				artLoaded = true;
+			});
+			
+			j5.requestAnimationFrame(function onFrame() {
+
+				xx += (mx-xx)/10
+				p = sin(xx*5);
+				i+=.051*my*my*my;
+				x+=.044*my*my*my;
+
+				container = j5.offset({
+					x:sin(i),
+					y:cos(i),
+					rotateX:x,
+					z:sin(x*2)*2,
+					rotateY:x*1.01
+				});
+
+				drawCube(texShader, container);
+				drawCube(texShader, j5.offset({rotateX:-pi90+p*pi45}, container));
+				drawCube(texShader, j5.offset({rotateY:-pi90+p*pi45}, container));
+				drawCube(texShader, j5.offset({z:-1, rotateY:pi45+p*pi45}, container))
+				drawCube(texShader, j5.offset({x:1, originY:1, rotateZ:pi45+p*pi45}, container));
+				
+				j5.requestAnimationFrame(onFrame);
+				
+			});
+
+		}
+		
+		window.addEventListener("load", init, false);
+
+	</script>
+	
+	<!-- Date: 2011-06-18 -->
+</head>
+<body>
+	<canvas id="webglcanvas" width="750" height="750"><!----></canvas>
+</body>
+</html>
