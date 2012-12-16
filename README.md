@@ -46,4 +46,6 @@ Project Status
 
 Development has halted; Archived on github.
 
+This was a personal WebGL project of mine. I now realise how un-optimized my GL API calls were.  The ball-room experiment, with default setting, uses over 2000 GL calls, mostly redundant ones.  Doh!  It's still runs well and was fun to make.
+
 Experiments do work.
