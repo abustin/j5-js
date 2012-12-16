@@ -3,7 +3,6 @@ J5.JS
 
 J5.JS is a thin tinker box abstraction around WebGL.  This lib takes an immediate-mode approach vs other libs such as three.js.
 
-
 Here's an abridged example.  For full working examples, please see experiments dir.
 
     var drawCube = j5.cube().draw;
@@ -38,9 +37,12 @@ Here's an abridged example.  For full working examples, please see experiments d
     
     });
 
+Experiment
+===
+<http://abustin.github.com/j5-js/>
 
 Project Status
-==
+===
 
 Development has halted; Archived on github.
 
